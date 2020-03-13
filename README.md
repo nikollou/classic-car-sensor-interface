@@ -8,7 +8,7 @@ Imgur album with pictures: https://imgur.com/gallery/zIYda
 
 ============================
 
-Hi, I believe Sean has done an amazing job with this project and I plan to adapt it to my cars (I have three classis non-obd cars) and also enhance the features. Maybe along the way I can help someone else too.
+Hi, I believe Sean has done an amazing job with this project and I plan to adapt it to my cars (I have three classiC non-obd cars) and also enhance the features. Maybe along the way I can help someone else too.
 
 Step 1 - Since Seab has not provided a schematic I will work to develop one and publish it.
 Step 2 - Test the module on the bench
