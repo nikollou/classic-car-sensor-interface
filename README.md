@@ -19,3 +19,5 @@ Step 4 - Develop new features
     
    
 Stay tuned!
+
+Thanks
