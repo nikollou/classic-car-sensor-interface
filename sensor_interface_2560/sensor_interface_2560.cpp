@@ -28,7 +28,7 @@ Add alarm functionality
   When triggered, pull up relevant screen and make red backlight
   Snooze function
   Oil Pressure Alarm must be contingent on engine running (RPM above 500)
-Change Engine CC to cc from in and correct MAF formula
+Change Engine Displacement to cc from in and correct MAF formula
 */
 
 // included library            // source
