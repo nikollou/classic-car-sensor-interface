@@ -79,12 +79,12 @@ const byte autoDimPin = A4; // pin for external brightness control
 const byte AFRatioPin = A5; // pin for LSU 4.9 O2 sensor controller linear output
 const byte intakePressPin = A6; // pin for intake manifold pressure (vac or boost)
 
-// analog input setup
+// analog input setupco
 const float aRef = 5.0; // analog reference for board (Volts)
-const float regVoltage = 5.0; // instrument unit voltage regulator output (Volts)
+const float regVoltage = 10.0; // instrument unit voltage regulator output (Volts) @@ Changed by me
 const float oilGaugeOhms = 13.0; // resistance of oil pressure gauge (ohms)
 const float fuelGaugeOhms = 13.0; // resistance of fuel level gauge (ohms)
-const float coolantGaugeOhms = 13.0; // resistance of coolant temperature gauge (ohms)
+const float coolantGaugeOhms = 62.0; // resistance of coolant temperature gauge (ohms) @@ Changed by me
 
 // Steinhart–Hart equation parameters for coolant temp sender
 // http://en.wikipedia.org/wiki/Thermistor 
@@ -934,9 +934,9 @@ float getFuelLevel()
 // Resolution:
 float getCoolantTemp()
 {
-  // Voltage divider maps 6.1 V to 5 V
-  float R1 = 22000.0; // value of R1 in voltage divider (ohms)
-  float R2 = 100000.0; // value of R2 in voltage divider (ohms)
+  // Voltage divider maps 6.1 V to 5 V @@ I think you take your instrument voltage and add 25%. (In my case 10V-> 12.5V) That is the max possible value that will come in, so then setup v.dividers to safely have up to 5V.
+  float R1 = 330.0; // value of R1 in voltage divider (ohms)
+  float R2 = 220.0; // value of R2 in voltage divider (ohms)
   // take 10 readings and sum them
   int val = 0;
   for (int i = 1; i <= 10; i++)
