@@ -21,7 +21,18 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*ToDo: 
+Rotary encoder to go back not just forward
+Add alarm functionality
+  User set for thresholds
+  When triggered, pull up relevant screen and make red backlight
+  Snooze function
+  Oil Pressure Alarm must be contingent on engine running (RPM above 500)
+Change Engine CC to cc from in and correct MAF formula
+*/
+
 // included library            // source
+#include <Arduino.h>           // @@ Added this when converting to CPP
 #include <BigNumbersFast.h>    // https://github.com/seanauff/BigNumbers/tree/Fast 
 #include <DallasTemperature.h> // http://www.hacktronics.com/Tutorials/arduino-1-wire-tutorial.html 
 #include <DS1307RTC.h>         // http://www.pjrc.com/teensy/td_libs_DS1307RTC.html 
@@ -44,6 +55,11 @@ const int refreshIntervalAddress = 8;
 const int displacementAddress1 = 9;
 const int displacementAddress2 = 10;
 const int engineCyclesAddress = 11;
+// @@ New Addresses for Alarm Limits
+const int coolantAlarm = 12;
+const int oilPressAlarm = 13;
+const int oilTempAlarm = 14;
+const int fuelLevelAlarm = 15;
 
 // interrupts
 const byte switchInterrupt = 0; // rotary encoder momentary switch on interrupt 0 (digital pin 2)
@@ -113,10 +129,10 @@ const byte modeMax = 16; // number of modes
 const byte modeClock = 1;
 const byte modeBattVoltage = 2;
 const byte modeOilPress = 3;
-const byte modeCoolantTemp = 4;
-const byte modeOutsideTemp = 5;
-const byte modeInsideTemp = 6;
-const byte modeOilTemp = 7;
+const byte modeCoolantTemp = 5;
+const byte modeOutsideTemp = 6;
+const byte modeInsideTemp = 7;
+const byte modeOilTemp = 4;
 const byte modeTransTemp = 8;
 const byte modeIntakeTemp = 9;
 const byte modeTach = 10;
@@ -138,6 +154,10 @@ const byte modeBigFont = 96;
 const byte modeLCDBrightness = 97;
 const byte modeLCDContrast = 98;
 const byte modeLCDAutoDim = 99;
+const byte modeSetCoolantAlarm = 80;
+const byte modeSetOilPressAlarm = 81;
+const byte modeSetOilTempAlarm = 82;
+const byte modeSetFuelAlarm = 83;
 
 byte mode = modeClock; // mode to start in
 byte previousMode = mode; // keep track of last mode to know when the mode changes to enable an immediate screen update
@@ -168,7 +188,7 @@ int currentYear = 2014;
 byte useSI = 0; // unit selector: 0 = SAE, 1 = SI
 byte lcdAutoDim = 0; // automatic brightness adjust: 0 = OFF, 1 = ON
 byte lcdBigFont = 1; // Big Font: 0 = OFF, 1 = ON
-byte engineCylinders = 8; // for tach calculation (pulses per revolution = 2 * cylinders / cycles)
+byte engineCylinders = 4; // for tach calculation (pulses per revolution = 2 * cylinders / cycles)
 byte engineCycles = 4; // for tach calculation
 int displacement = 390; // (units of cu in) for MAFR calculations
 int refreshInterval = 750; // milliseconds between sensor updates
@@ -739,10 +759,12 @@ void loop()
     EEPROM.write(useSIAddress, useSI); // store new value to EEPROM
   }
   
+  //@@ Here I will fix the menu navigation issue going backwards.
   // if no button pressed, read Encoder and change modes
   else
   {
     modeSwitchPosition = modeSwitch.read();
+    serial.Print(modeSwitchPosition)
     if(modeSwitchPosition % 4 == 0)
     {
       mode = modeSwitchPosition / 4; // read encoder position and set mode
@@ -1049,6 +1071,7 @@ void pressButton()
 // returns: the value that it displayed
 // byte displayMode: the mode to display
 // boolean bigFont: sets if small or large font is used
+//******* This is the "menu", here I will add pages
 float displayInfo(byte displayMode, boolean bigFont)
 {
   switch (displayMode)
