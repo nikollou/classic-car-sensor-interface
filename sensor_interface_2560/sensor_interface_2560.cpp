@@ -21,18 +21,18 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/*ToDo: 
+/*ToDo: @@
 Rotary encoder to go back not just forward
 Add alarm functionality
   User set for thresholds
   When triggered, pull up relevant screen and make red backlight
   Snooze function
   Oil Pressure Alarm must be contingent on engine running (RPM above 500)
+  Remove Fahrenheit functionality
 Change Engine Displacement to cc from in and correct MAF formula
 */
 
 // included library            // source
-#include <Arduino.h>           // @@ Added this when converting to CPP
 #include <BigNumbersFast.h>    // https://github.com/seanauff/BigNumbers/tree/Fast 
 #include <DallasTemperature.h> // http://www.hacktronics.com/Tutorials/arduino-1-wire-tutorial.html 
 #include <DS1307RTC.h>         // http://www.pjrc.com/teensy/td_libs_DS1307RTC.html 
@@ -55,11 +55,11 @@ const int refreshIntervalAddress = 8;
 const int displacementAddress1 = 9;
 const int displacementAddress2 = 10;
 const int engineCyclesAddress = 11;
-// @@ New Addresses for Alarm Limits
-const int coolantAlarm = 12;
-const int oilPressAlarm = 13;
-const int oilTempAlarm = 14;
-const int fuelLevelAlarm = 15;
+// @@ New Addresses for Alarm Limits USE IF U WANT USER SETTABLE VALUES FROM UI
+// const int coolantAlarmAddress = 12;
+// const int oilPressAlarmAddress = 13;
+// const int oilTempAlarmAddress = 14;
+// const int fuelLevelAlarmAddress = 15;
 
 // interrupts
 const byte switchInterrupt = 0; // rotary encoder momentary switch on interrupt 0 (digital pin 2)
@@ -154,10 +154,11 @@ const byte modeBigFont = 96;
 const byte modeLCDBrightness = 97;
 const byte modeLCDContrast = 98;
 const byte modeLCDAutoDim = 99;
-const byte modeSetCoolantAlarm = 80;
-const byte modeSetOilPressAlarm = 81;
-const byte modeSetOilTempAlarm = 82;
-const byte modeSetFuelAlarm = 83;
+//@@ New pages for Alarms
+// const byte modeSetCoolantAlarm = 80;
+// const byte modeSetOilPressAlarm = 81;
+// const byte modeSetOilTempAlarm = 82;
+// const byte modeSetFuelAlarm = 83;
 
 byte mode = modeClock; // mode to start in
 byte previousMode = mode; // keep track of last mode to know when the mode changes to enable an immediate screen update
@@ -192,11 +193,24 @@ byte engineCylinders = 4; // for tach calculation (pulses per revolution = 2 * c
 byte engineCycles = 4; // for tach calculation
 int displacement = 390; // (units of cu in) for MAFR calculations
 int refreshInterval = 750; // milliseconds between sensor updates
+int alarmCheckInterval = 100; //@@ New code for alarm check
+
+// ## @@ Alarm setup
+int coolantAlarm = 28; // upper limit for coolant alarm in Celcius
+int fuelAlarm = 15; // lower limit of fuel level
+int oilPressUpperAlarm = 1200; // upper oil pressure alarm in PSI
+int oilPressLowerAlarm = 3; // lower oil pressure alarm in PSI
+int oilTempAlarm = 120; // oil temp alarm in C
+int idleRPM = 400; // Min RPM to make sure engine is running for oil pressure min alarm
+bool alarmTriggered = false; // initiate the check variable| Potentially not required once array is used
+bool alarmTriggeredPreviousState = false; // initiate the check variable
+int modeBeforeAlarm = 0; // needed to remember the screen before an alarm was triggered
 
 // timing values
 unsigned long previousMillis = 0; // for sensor refresh interval
 unsigned long timeSwitchLastPressed = 0; // for switch debounce
 byte switchDebounceInterval = 200; // time in milliseconds where switch press will do nothing
+unsigned long previousMillisAlarm = 0; // @@ for alarm check interval
 
 // interrupt volatile variables
 volatile int RPMpulses = 0;
@@ -310,6 +324,65 @@ void setup()
 // main loop, runs continuously after setup()
 void loop()
 {
+  // @@ Adding code for alarm checking
+
+  if(millis() - previousMillisAlarm > alarmCheckInterval)
+  {
+    previousMillisAlarm = millis();
+    if (getCoolantTemp() >= coolantAlarm && alarmTriggered == false)
+    {
+      modeBeforeAlarm = modeSwitch.read() / 4;
+      modeSwitch.write(modeCoolantTemp * 4);
+      lcdHue = 120;
+      setRGBFromHue();
+      lcd.clear();
+      displayInfo(modeCoolantTemp, lcdBigFont); // update display
+      alarmTriggered = true;
+    }
+    else if (getCoolantTemp() >= coolantAlarm && alarmTriggered == true)
+    {
+      unsigned long currentMillis = millis();
+       while (millis() - currentMillis <= 5000)
+         {
+          writeLCDValues();
+         }
+      alarmTriggered = true;
+    }
+    else{
+      alarmTriggered=false;
+    }
+    
+    if(alarmTriggered == false && alarmTriggeredPreviousState == true)
+    {
+      modeSwitch.write(modeBeforeAlarm * 4);
+      lcd.clear();
+      displayInfo(modeBeforeAlarm, lcdBigFont); // update display
+      lcdHue = 50;
+      setRGBFromHue();
+    }
+    alarmTriggeredPreviousState=alarmTriggered;
+
+
+    float pressure = getOilPress();
+    if (pressure >= oilPressUpperAlarm)
+    {
+      Serial.println("Oil Upper Limit");
+    }
+    if (pressure <= oilPressLowerAlarm && getRPM() >= idleRPM)
+    {
+      Serial.println("Oil Lower Limit");
+    }
+    if (getFuelLevel() <= fuelAlarm)
+    {
+      Serial.println("Fuel is Low MALAKA");
+    }
+    if (sensors.getTempC(oilTempDigital) >= oilTempAlarm)
+    {
+      Serial.println("Oil Temp Alarm");
+    }
+
+  }
+  
   // change LCD parameters if button pressed while displaying LCD setup
   if(mode == modeLCDSetup && buttonPressed)
   {
@@ -764,7 +837,6 @@ void loop()
   else
   {
     modeSwitchPosition = modeSwitch.read();
-    serial.Print(modeSwitchPosition)
     if(modeSwitchPosition % 4 == 0)
     {
       mode = modeSwitchPosition / 4; // read encoder position and set mode
@@ -957,7 +1029,7 @@ float getFuelLevel()
 float getCoolantTemp()
 {
   // Voltage divider maps 6.1 V to 5 V @@ I think you take your instrument voltage and add 25%. (In my case 10V-> 12.5V) That is the max possible value that will come in, so then setup v.dividers to safely have up to 5V.
-  float R1 = 330.0; // value of R1 in voltage divider (ohms)
+  float R1 = 220.0; // value of R1 in voltage divider (ohms)
   float R2 = 220.0; // value of R2 in voltage divider (ohms)
   // take 10 readings and sum them
   int val = 0;
